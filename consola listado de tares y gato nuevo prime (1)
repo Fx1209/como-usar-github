@@ -1,0 +1,325 @@
+import json
+import os
+from datetime import datetime
+import random
+
+TASKS_FILE = "tasks.json"
+
+def load_tasks():
+    """Carga las tareas del archivo JSON."""
+    if os.path.exists(TASKS_FILE):
+        with open(TASKS_FILE, "r") as file:
+            return json.load(file)
+    return []
+
+def save_tasks(tasks):
+    """Guarda las tareas en el archivo JSON."""
+    with open(TASKS_FILE, "w") as file:
+        json.dump(tasks, file, indent=4)
+
+def add_task(title, description, due_date):
+    """Agrega una nueva tarea a la lista."""
+    tasks = load_tasks()
+    tasks.append({
+        "title": title,
+        "description": description,
+        "due_date": due_date,
+        "completed": False
+    })
+    save_tasks(tasks)
+    print("Tarea agregada exitosamente.")
+
+def list_tasks():
+    """Muestra la lista de tareas."""
+    tasks = load_tasks()
+    if not tasks:
+        print("No hay tareas pendientes.")
+        return
+    for index, task in enumerate(tasks):
+        status = "[✓]" if task.get("completed", False) else "[ ]"
+        title = task.get("title", "(Sin título)")
+        due_date = task.get("due_date", "(Sin fecha)")
+        description = task.get("description", "(Sin descripción)")
+        print(f"{index + 1}. {status} {title} - {due_date}")
+        print(f"   {description}")
+
+def delete_task(index):
+    """Elimina una tarea de la lista."""
+    tasks = load_tasks()
+    if 0 <= index < len(tasks):
+        del tasks[index]
+        save_tasks(tasks)
+        print("Tarea eliminada exitosamente.")
+    else:
+        print("Índice de tarea inválido.")
+
+def mark_completed(index):
+    """Marca una tarea como completada."""
+    tasks = load_tasks()
+    if 0 <= index < len(tasks):
+        tasks[index]["completed"] = True
+        save_tasks(tasks)
+        print("Tarea marcada como completada.")
+    else:
+        print("Índice de tarea inválido.")
+
+def crear_tablero():
+    """Crea un tablero de 3x3 vacío."""
+    return [[' ' for _ in range(3)] for _ in range(3)]
+
+def mostrar_tablero(tablero):
+    """Muestra el tablero en la consola."""
+    print("-------------")
+    for fila in range(3):
+        print("|", end="")
+        for columna in range(3):
+            print(f" {tablero[fila][columna]} |", end="")
+        print("\n-------------")
+
+def obtener_movimiento_jugador(tablero, jugador):
+    """Obtiene el movimiento del jugador usando números del 1 al 9."""
+    while True:
+        try:
+            movimiento = int(input(f"Jugador {jugador}, ingresa un número del 1 al 9: "))
+            if 1 <= movimiento <= 9:
+                fila = (movimiento - 1) // 3
+                columna = (movimiento - 1) % 3
+                if tablero[fila][columna] == ' ':
+                    return fila, columna
+                else:
+                    print("Casilla ocupada. Intenta de nuevo.")
+            else:
+                print("Número inválido. Intenta de nuevo.")
+        except ValueError:
+            print("Entrada inválida. Intenta de nuevo.")
+
+def verificar_victoria(tablero, jugador):
+    """Verifica si el jugador ha ganado."""
+    # Verificar filas
+    for fila in tablero:
+        if fila[0] == fila[1] == fila[2] == jugador:
+            return True
+    # Verificar columnas
+    for columna in range(3):
+        if tablero[0][columna] == tablero[1][columna] == tablero[2][columna] == jugador:
+            return True
+    # Verificar diagonales
+    if tablero[0][0] == tablero[1][1] == tablero[2][2] == jugador:
+        return True
+    if tablero[0][2] == tablero[1][1] == tablero[2][0] == jugador:
+        return True
+    return False
+
+def verificar_empate(tablero):
+    """Verifica si el juego ha terminado en empate."""
+    for fila in tablero:
+        for celda in fila:
+            if celda == ' ':
+                return False
+    return True
+
+def obtener_mejor_movimiento(tablero, jugador):
+    """Utiliza el algoritmo minimax para encontrar el mejor movimiento para la IA."""
+    mejor_puntuacion = float('-inf')
+    mejor_movimiento = None
+    for fila in range(3):
+        for columna in range(3):
+            if tablero[fila][columna] == ' ':
+                tablero[fila][columna] = jugador
+                puntuacion = minimax(tablero, jugador, False)
+                tablero[fila][columna] = ' '
+                if puntuacion > mejor_puntuacion:
+                    mejor_puntuacion = puntuacion
+                    mejor_movimiento = (fila, columna)
+    return mejor_movimiento
+
+def minimax(tablero, jugador, maximizando):
+    """Algoritmo minimax para evaluar movimientos."""
+    if verificar_victoria(tablero, 'X'):
+        return 1 if maximizando else -1
+    if verificar_victoria(tablero, 'O'):
+        return -1 if maximizando else 1
+    if verificar_empate(tablero):
+        return 0
+
+    if maximizando:
+        mejor_puntuacion = float('-inf')
+        for fila in range(3):
+            for columna in range(3):
+                if tablero[fila][columna] == ' ':
+                    tablero[fila][columna] = 'X'
+                    puntuacion = minimax(tablero, 'X', False)
+                    tablero[fila][columna] = ' '
+                    mejor_puntuacion = max(mejor_puntuacion, puntuacion)
+        return mejor_puntuacion
+    else:
+        mejor_puntuacion = float('inf')
+        for fila in range(3):
+            for columna in range(3):
+                if tablero[fila][columna] == ' ':
+                    tablero[fila][columna] = 'O'
+                    puntuacion = minimax(tablero, 'O', True)
+                    tablero[fila][columna] = ' '
+                    mejor_puntuacion = min(mejor_puntuacion, puntuacion)
+        return mejor_puntuacion
+
+def dificultad_dificil(tablero, jugador):
+    """Estrategia de IA difícil, prioriza las mejores jugadas."""
+    mejor_puntuacion = float('-inf')
+    mejor_movimiento = None
+    
+    # Comprueba si hay un movimiento que lleva a la victoria
+    for fila in range(3):
+        for columna in range(3):
+            if tablero[fila][columna] == ' ':
+                tablero[fila][columna] = jugador
+                if verificar_victoria(tablero, jugador):
+                    return fila, columna
+                tablero[fila][columna] = ' '
+
+    # Bloquea al oponente si está a punto de ganar
+    oponente = 'X' if jugador == 'O' else 'O'
+    for fila in range(3):
+        for columna in range(3):
+            if tablero[fila][columna] == ' ':
+                tablero[fila][columna] = oponente
+                if verificar_victoria(tablero, oponente):
+                    tablero[fila][columna] = ' '
+                    return fila, columna
+                tablero[fila][columna] = ' '
+
+    # Busca la mejor jugada en las esquinas
+    esquinas = [(0, 0), (0, 2), (2, 0), (2, 2)]
+    for fila, columna in esquinas:
+        if tablero[fila][columna] == ' ':
+            return fila, columna
+
+    # Busca la mejor jugada en los lados
+    lados = [(0, 1), (1, 0), (1, 2), (2, 1)]
+    for fila, columna in lados:
+        if tablero[fila][columna] == ' ':
+            return fila, columna
+
+    # Si no hay movimientos críticos, usa minimax
+    return obtener_mejor_movimiento(tablero, jugador)
+
+def jugar_gato():
+    """Función principal del juego."""
+    tablero = crear_tablero()
+
+    # Elegir modo de juego
+    while True:
+        modo = input("¿Quieres jugar contra la IA (IA) o con un amigo (Amigo)? ").upper()
+        if modo in ('IA', 'AMIGO'):
+            break
+        else:
+            print("Entrada inválida. Elige IA o AMIGO.")
+
+    # Elegir jugador
+    while True:
+        jugador1 = input("Jugador 1, ¿quieres ser X u O? ").upper()
+        if jugador1 in ('X', 'O'):
+            break
+        else:
+            print("Entrada inválida. Elige X u O.")
+
+    # Determinar jugador 2
+    if modo == 'IA':
+        jugador2 = 'O' if jugador1 == 'X' else 'X'
+    else:
+        while True:
+            jugador2 = input("Jugador 2, ¿quieres ser X u O? ").upper()
+            if jugador2 in ('X', 'O') and jugador2 != jugador1:
+                break
+            else:
+                print("Entrada inválida. Elige X u O diferente al del Jugador 1.")
+
+    # Determinar quién empieza
+    jugador_actual = jugador1 if random.choice([True, False]) else jugador2
+
+    # Elegir X u O al azar entre los jugadores
+    if modo == 'AMIGO':
+        if random.choice([True, False]):
+            jugador1, jugador2 = jugador2, jugador1
+            print(f"Jugador 2, ¡has sido elegido para ser {jugador2} primero!")
+        else:
+            print(f"Jugador 1, ¡has sido elegido para ser {jugador1} primero!")
+
+    while True:
+        mostrar_tablero(tablero)
+
+        if modo == 'AMIGO':
+            fila, columna = obtener_movimiento_jugador(tablero, jugador_actual)
+        else:
+            if jugador_actual == jugador1:
+                fila, columna = obtener_movimiento_jugador(tablero, jugador_actual)
+            else:
+                fila, columna = dificultad_dificil(tablero, jugador2)
+                print(f"La IA juega: {fila * 3 + columna + 1}")
+
+        tablero[fila][columna] = jugador_actual
+
+        if verificar_victoria(tablero, jugador_actual):
+            mostrar_tablero(tablero)
+            print(f"¡El jugador {jugador_actual} ha ganado!")
+            print("🎉🎉🎉 ¡Confeti! 🎉🎉🎉")
+            print("  /\\_/\\  ")
+            print(" ( o.o ) ")
+            print("  > ^ <  ")
+            print(" /   ^   \\ ")
+            print("/     ^     \\")
+            break
+        elif verificar_empate(tablero):
+            mostrar_tablero(tablero)
+            print("¡El juego ha terminado en empate!")
+            break
+
+        jugador_actual = jugador2 if jugador_actual == jugador1 else jugador1
+
+def main():
+    """Función principal del gestor de tareas."""
+    while True:
+        print("\nGestor de Tareas")
+        print("1. Agregar tarea")
+        print("2. Listar tareas")
+        print("3. Eliminar tarea")
+        print("4. Marcar tarea como completada")
+        print("5. Salir")
+        print("6. Jugar al Gato")
+        opcion = input("Seleccione una opción: ")
+        
+        if opcion == "1":
+            title = input("Título: ")
+            description = input("Descripción: ")
+            due_date = input("Fecha de vencimiento (YYYY-MM-DD): ")
+            try:
+                datetime.strptime(due_date, "%Y-%m-%d")
+                add_task(title, description, due_date)
+            except ValueError:
+                print("Formato de fecha inválido. Use YYYY-MM-DD.")
+        elif opcion == "2":
+            list_tasks()
+        elif opcion == "3":
+            list_tasks()
+            try:
+                index = int(input("Número de tarea a eliminar: ")) - 1
+                delete_task(index)
+            except ValueError:
+                print("Entrada inválida.")
+        elif opcion == "4":
+            list_tasks()
+            try:
+                index = int(input("Número de tarea a marcar como completada: ")) - 1
+                mark_completed(index)
+            except ValueError:
+                print("Entrada inválida.")
+        elif opcion == "5":
+            print("Saliendo...")
+            break
+        elif opcion == "6":
+            jugar_gato()  # Inicia el juego del gato
+        else:
+            print("Opción no válida. Intente de nuevo.")
+
+if __name__ == "__main__":
+    main()
